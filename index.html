@@ -6,16 +6,42 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gestión de Tickets SIGOD - Senior Dashboard</title>
     <link rel="stylesheet" href="tickets.css">
-    <link rel="shortcut icon" href="icon.png" type="image/x-icon">
+    <link rel="shortcut icon" href="assets/icon.png" type="image/x-icon">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="apple-touch-icon" href="icons/apple-icon-180.png">
 
-<meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
 
 </head>
 
-<body>
-    <div class="app-container">
+<body class="auth-mode">
+    <!-- Login Screen -->
+    <div id="login-screen" class="login-screen">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="logo-circle">S</div>
+                <h1>SIGOD</h1>
+                <p>Sistema de Gestión de Tickets</p>
+            </div>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="login-username">Usuario</label>
+                    <input type="text" id="login-username" required placeholder="Ingresa tu usuario">
+                </div>
+                <div class="form-group">
+                    <label for="login-password">Contraseña</label>
+                    <input type="password" id="login-password" required placeholder="••••••••">
+                </div>
+                <div id="login-error" class="error-msg" style="display: none;"></div>
+                <button type="submit" class="btn-primary btn-block">Iniciar Sesión</button>
+            </form>
+            <div class="login-footer">
+                <p>&copy; 2026 SIGOD Security Framework</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="app-container" id="app-container" style="display: none;">
         <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-header">
@@ -25,6 +51,8 @@
             <nav class="sidebar-nav">
                 <a href="index.html" class="active"><span class="icon"></span> Dashboard</a>
                 <a href="#"><span class="icon"></span> Kanban Board (Próximamente)</a>
+                <a href="#" id="logout-btn" style="margin-top: auto; color: #f87171;"><span class="icon"></span> Cerrar
+                    Sesión</a>
             </nav>
             <div class="sidebar-footer">
                 <p>v2.0.0 - Senior Edition</p>
@@ -34,13 +62,18 @@
         <!-- Main Content -->
         <main class="main-content">
             <header class="top-bar">
-                <div class="search-container">
-                    <span class="search-icon"></span>
-                    <input type="text" id="global-search" placeholder="Búsqueda rápida (ID, Ticket, Patrón)...">
+                <div style="display: flex; align-items: center;">
+                    <button class="mobile-nav-toggle" id="sidebar-toggle" style="display: none;">☰</button>
+                    <div class="search-container">
+                        <span class="search-icon"></span>
+                        <input type="text" id="global-search" placeholder="Búsqueda rápida (ID, Ticket, Patrón)...">
+                    </div>
                 </div>
                 <div class="user-profile">
                     <span class="notifications"></span>
                     <div class="avatar">G</div>
+                    <button id="logout-btn-top" class="text-btn"
+                        style="color: #f87171; font-size: 0.85rem; margin-left: 8px;">Salir</button>
                 </div>
             </header>
 
@@ -62,21 +95,27 @@
                         <h3>Abiertos</h3>
                         <p id="count-open">0</p>
                     </div>
-                    <div class="stat-icon open"></div>
+                    <div class="stat-icon open">
+                        <img src="assets/openTux.png" alt="Abiertos">
+                    </div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-info">
                         <h3>En Proceso</h3>
                         <p id="count-process">0</p>
                     </div>
-                    <div class="stat-icon process"></div>
+                    <div class="stat-icon process">
+                        <img src="assets/processTux.png" alt="En Proceso">
+                    </div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-info">
                         <h3>Finalizados</h3>
                         <p id="count-done">0</p>
                     </div>
-                    <div class="stat-icon done"></div>
+                    <div class="stat-icon done">
+                        <img src="assets/completedTux.png" alt="Finalizados">
+                    </div>
                 </div>
             </div>
 
@@ -197,7 +236,7 @@
                 <div class="form-group">
                     <label>Adjuntar Imágenes (JPG, PNG)</label>
                     <div class="upload-zone" id="upload-zone">
-                        <span>📷 Haz clic o arrastra imágenes aquí</span>
+                        <span>Haz clic o arrastra imágenes aquí</span>
                         <input type="file" id="image-input" accept="image/png, image/jpeg" multiple hidden>
                     </div>
                     <div class="preview-gallery" id="preview-gallery"></div>

@@ -1,4 +1,4 @@
-const VERSION = "v1.0.0-tickets";
+const VERSION = "v2.1.0-tux-stats";
 const CACHE_NAME = `tickets-cache-${VERSION}`;
 const STATIC_ASSETS = [
     "/",
@@ -6,7 +6,10 @@ const STATIC_ASSETS = [
     "/tickets.css",
     "/tickets.js",
     "/icon.png",
-    "/manifest.json"
+    "/manifest.json",
+    "/assets/openTux.png",
+    "/assets/processTux.png",
+    "/assets/completedTux.png"
 ];
 
 self.addEventListener("install", (event) => {

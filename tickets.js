@@ -23,7 +23,8 @@ const TicketApp = (() => {
             pattern: '',
             origin: ''
         },
-        currentFiles: [] // Store File objects for upload
+        currentFiles: [], // Store File objects for upload
+        user: null
     };
 
     // --- DOM ELEMENTS ---
@@ -40,7 +41,11 @@ const TicketApp = (() => {
             done: document.getElementById('count-done')
         },
         toast: document.getElementById('notification-toast'),
-        noResults: document.getElementById('no-results')
+        noResults: document.getElementById('no-results'),
+        loginScreen: document.getElementById('login-screen'),
+        appContainer: document.getElementById('app-container'),
+        loginForm: document.getElementById('login-form'),
+        loginError: document.getElementById('login-error')
     };
 
     // --- STORAGE MODULE (SUPABASE) ---
@@ -156,6 +161,82 @@ const TicketApp = (() => {
         }
     };
 
+    // --- AUTH MODULE ---
+    const Auth = {
+        async hashPassword(password) {
+            const msgBuffer = new TextEncoder().encode(password);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        },
+
+        async handleLogin(e) {
+            e.preventDefault();
+            const username = document.getElementById('login-username').value.trim();
+            const password = document.getElementById('login-password').value.trim();
+            DOM.loginError.style.display = 'none';
+
+            try {
+                const hashedPassword = await this.hashPassword(password);
+                const { data: user, error } = await supabase
+                    .from('users')
+                    .select('id, username, full_name')
+                    .eq('username', username)
+                    .eq('password_hash', hashedPassword)
+                    .single();
+
+                if (error) {
+                    if (error.code === 'PGRST116') {
+                        DOM.loginError.textContent = 'Usuario o contraseña incorrectos.';
+                    } else {
+                        throw error;
+                    }
+                    DOM.loginError.style.display = 'block';
+                    return;
+                }
+
+                if (user) {
+                    sessionStorage.setItem('kanban_user', JSON.stringify(user));
+                    state.user = user;
+                    this.showApp();
+                }
+            } catch (err) {
+                console.error('Error detallado:', err);
+                DOM.loginError.textContent = `Error: ${err.message || 'Error de conexión.'}`;
+                DOM.loginError.style.display = 'block';
+            }
+        },
+
+        showApp() {
+            document.body.classList.remove('auth-mode');
+            DOM.loginScreen.style.display = 'none';
+            DOM.appContainer.style.display = 'flex';
+            
+            // Update user info in UI
+            if (state.user) {
+                const avatar = document.querySelector('.avatar');
+                if (avatar) avatar.textContent = state.user.full_name.charAt(0);
+            }
+
+            TicketApp.loadData();
+        },
+
+        checkSession() {
+            const savedUser = sessionStorage.getItem('kanban_user');
+            if (savedUser) {
+                state.user = JSON.parse(savedUser);
+                this.showApp();
+                return true;
+            }
+            return false;
+        },
+
+        logout() {
+            sessionStorage.removeItem('kanban_user');
+            window.location.reload();
+        }
+    };
+
     // --- UI CONTROLLER ---
     const UI = {
         render() {
@@ -179,11 +260,16 @@ const TicketApp = (() => {
                         <td>${ticket.assignee}</td>
                         <td>
                             <div class="action-btns">
-                                <button class="icon-btn edit-btn" data-id="${ticket.id}" title="Editar">editar</button>
-                                <button class="icon-btn delete-btn" data-id="${ticket.id}" title="Eliminar">eliminar</button>
+                                <button class="icon-btn edit-btn" data-id="${ticket.id}" title="Editar">✏️</button>
+                                <button class="icon-btn delete-btn" data-id="${ticket.id}" title="Eliminar">🗑️</button>
                             </div>
                         </td>
                     `;
+                    tr.addEventListener('click', (e) => {
+                        // Don't trigger if an action button was clicked
+                        if (e.target.closest('.action-btns')) return;
+                        UI.openModal(ticket.id, true);
+                    });
                     DOM.tableBody.appendChild(tr);
                 });
             }
@@ -221,15 +307,21 @@ const TicketApp = (() => {
             });
         },
 
-        openModal(id = null) {
+        openModal(id = null, viewOnly = false) {
             DOM.form.reset();
             DOM.previewGallery.innerHTML = '';
             state.currentFiles = [];
 
+            // Toggle form accessibility
+            const inputs = DOM.form.querySelectorAll('input, select, textarea');
+            inputs.forEach(input => input.disabled = viewOnly);
+            document.getElementById('save-ticket').style.display = viewOnly ? 'none' : 'block';
+            document.getElementById('upload-zone').style.display = viewOnly ? 'none' : 'block';
+
             if (id) {
-                const ticket = state.tickets.find(t => t.id === id);
+                const ticket = state.tickets.find(t => t.id === parseInt(id) || t.id === id);
                 if (ticket) {
-                    document.getElementById('modal-title').textContent = 'Editar Ticket ' + ticket.ticket_number;
+                    document.getElementById('modal-title').textContent = viewOnly ? 'Detalles del Ticket ' + ticket.ticket_number : 'Editar Ticket ' + ticket.ticket_number;
                     document.getElementById('ticket-id-hidden').value = ticket.id;
                     document.getElementById('ticket-title').value = ticket.title;
                     document.getElementById('ticket-sir-manual').value = ticket.ticket_number;
@@ -239,12 +331,11 @@ const TicketApp = (() => {
                     document.getElementById('ticket-origin').value = ticket.origin;
                     document.getElementById('ticket-desc').value = ticket.description;
 
-                    // Render existing attachments if any
+                    // Render existing attachments
                     if (ticket.ticket_attachments) {
                         ticket.ticket_attachments.forEach(att => {
                             const item = document.createElement('div');
                             item.className = 'preview-item';
-                            // Note: In a real app, you'd get the public URL here
                             item.innerHTML = `<span>📎 ${att.file_name}</span>`;
                             DOM.previewGallery.appendChild(item);
                         });
@@ -437,13 +528,38 @@ const TicketApp = (() => {
             // Export
             document.getElementById('export-csv-btn').onclick = () => Export.toCSV();
 
+            // Auth Events
+            DOM.loginForm.onsubmit = (e) => Auth.handleLogin(e);
+            
+            const logoutLogic = (e) => {
+                e.preventDefault();
+                Auth.logout();
+            };
+            
+            document.getElementById('logout-btn').onclick = logoutLogic;
+            const topLogout = document.getElementById('logout-btn-top');
+            if (topLogout) topLogout.onclick = logoutLogic;
+
+            // Mobile Toggle
+            const sidebar = document.querySelector('.sidebar');
+            document.getElementById('sidebar-toggle').onclick = (e) => {
+                e.stopPropagation();
+                sidebar.classList.toggle('active');
+            };
+
+            document.addEventListener('click', (e) => {
+                if (!sidebar.contains(e.target) && sidebar.classList.contains('active')) {
+                    sidebar.classList.remove('active');
+                }
+            });
+
             // Table actions (delegation)
             DOM.tableBody.onclick = async (e) => {
                 const id = e.target.dataset.id;
                 if (!id) return;
 
                 if (e.target.classList.contains('edit-btn')) {
-                    UI.openModal(id);
+                    UI.openModal(id, false);
                 } else if (e.target.classList.contains('delete-btn')) {
                     if (confirm('¿Seguro que deseas eliminar este ticket?')) {
                         await Logic.deleteTicket(id);
@@ -459,9 +575,15 @@ const TicketApp = (() => {
     return {
         async init() {
             Handlers.init();
+            if (!Auth.checkSession()) {
+                console.log('Esperando autenticación...');
+            }
+        },
+
+        async loadData() {
             state.tickets = await Storage.fetchTickets();
             UI.render();
-            console.log('SIGOD Ticket System Initialized with Supabase');
+            console.log('SIGOD Ticket System Data Loaded');
         }
     };
 })();

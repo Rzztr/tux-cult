@@ -1,6 +1,6 @@
 {
-    "name": "Kanban Dashboard",
-    "short_name": "Kanban",
+    "name": "tickets SIGOD",
+    "short_name": "tickets SIGOD",
     "start_url": "/",
     "display": "standalone",
     "background_color": "#f4f7f9",
