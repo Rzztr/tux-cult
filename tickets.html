@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Tickets SIGOD - Senior Dashboard</title>
+    <link rel="stylesheet" href="tickets.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo-circle">S</div>
+                <h2>SIGOD</h2>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="#" class="active"><span class="icon"></span> Dashboard</a>
+                <a href="index.html"><span class="icon"></span> Kanban Board</a>
+            </nav>
+            <div class="sidebar-footer">
+                <p>v2.0.0 - Senior Edition</p>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-bar">
+                <div class="search-container">
+                    <span class="search-icon"></span>
+                    <input type="text" id="global-search" placeholder="Búsqueda rápida (ID, Ticket, Patrón)...">
+                </div>
+                <div class="user-profile">
+                    <span class="notifications"></span>
+                    <div class="avatar">G</div>
+                </div>
+            </header>
+
+            <section class="dashboard-header">
+                <div class="welcome">
+                    <h1>Gestión de Tickets</h1>
+                    <p>Bienvenido al panel central de reportes de seguridad.</p>
+                </div>
+                <div class="actions">
+                    <button id="export-csv-btn" class="btn-secondary">Exportar CSV</button>
+                    <button id="open-modal-btn" class="btn-primary">+ Nuevo Ticket</button>
+                </div>
+            </section>
+
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-info">
+                        <h3>Abiertos</h3>
+                        <p id="count-open">0</p>
+                    </div>
+                    <div class="stat-icon open"></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-info">
+                        <h3>En Proceso</h3>
+                        <p id="count-process">0</p>
+                    </div>
+                    <div class="stat-icon process"></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-info">
+                        <h3>Finalizados</h3>
+                        <p id="count-done">0</p>
+                    </div>
+                    <div class="stat-icon done"></div>
+                </div>
+            </div>
+
+            <!-- Filters Section -->
+            <div class="filters-panel">
+                <div class="filter-header">
+                    <h3>Filtros Avanzados</h3>
+                    <button id="clear-filters" class="text-btn">Limpiar</button>
+                </div>
+                <div class="filter-grid">
+                    <div class="filter-group">
+                        <label>ID Interno</label>
+                        <input type="number" id="filter-id" placeholder="Ej: 5">
+                    </div>
+                    <div class="filter-group">
+                        <label>Ticket (SIR)</label>
+                        <input type="text" id="filter-sir" placeholder="SIR000...">
+                    </div>
+                    <div class="filter-group">
+                        <label>Desde</label>
+                        <input type="date" id="filter-date-start">
+                    </div>
+                    <div class="filter-group">
+                        <label>Hasta</label>
+                        <input type="date" id="filter-date-end">
+                    </div>
+                    <div class="filter-group">
+                        <label>Patrón de Ataque</label>
+                        <input type="text" id="filter-pattern" placeholder="Ej: Brute Force">
+                    </div>
+                    <div class="filter-group">
+                        <label>Dominio/Origen</label>
+                        <input type="text" id="filter-origin" placeholder="Ej: 192.168.1.1">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table Container -->
+            <div class="table-container">
+                <table id="tickets-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Nº Ticket</th>
+                            <th>Estado</th>
+                            <th>Fecha Creación</th>
+                            <th>Patrón de Ataque</th>
+                            <th>Origen/Destino</th>
+                            <th>Asignado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tickets-body">
+                        <!-- Rendered by JS -->
+                    </tbody>
+                </table>
+                <div id="no-results" class="no-results" style="display: none;">
+                    No se encontraron tickets con los filtros aplicados.
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Ticket Modal -->
+    <div id="ticket-modal" class="modal">
+        <div class="modal-content">
+            <header class="modal-header">
+                <h2 id="modal-title">Crear Nuevo Ticket</h2>
+                <span class="close-modal">&times;</span>
+            </header>
+            <form id="ticket-form" class="ticket-form">
+                <input type="hidden" id="ticket-id-hidden">
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="ticket-title">Título del Reporte</label>
+                        <input type="text" id="ticket-title" required placeholder="Resumen breve del incidente">
+                    </div>
+                    <div class="form-group">
+                        <label for="ticket-sir-manual">Número SIR (Opcional)</label>
+                        <input type="text" id="ticket-sir-manual"
+                            placeholder="Se generará automáticamente si queda vacío">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="ticket-status">Estado</label>
+                        <select id="ticket-status">
+                            <option value="Abierto">Abierto</option>
+                            <option value="En Proceso">En Proceso</option>
+                            <option value="Finalizado">Finalizado</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="ticket-assignee">Asignado a</label>
+                        <input type="text" id="ticket-assignee" placeholder="Nombre del usuario">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="ticket-pattern">Patrón de Ataque</label>
+                        <input type="text" id="ticket-pattern" placeholder="Ej: DDoS, Inyección SQL">
+                    </div>
+                    <div class="form-group">
+                        <label for="ticket-origin">Origen (Dominio/IP)</label>
+                        <input type="text" id="ticket-origin" placeholder="192.168.x.x">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="ticket-desc">Descripción Detallada</label>
+                    <textarea id="ticket-desc" rows="4" placeholder="Detalles técnicos del incidente..."></textarea>
+                </div>
+
+                <!-- Image Upload -->
+                <div class="form-group">
+                    <label>Adjuntar Imágenes (JPG, PNG)</label>
+                    <div class="upload-zone" id="upload-zone">
+                        <span>📷 Haz clic o arrastra imágenes aquí</span>
+                        <input type="file" id="image-input" accept="image/png, image/jpeg" multiple hidden>
+                    </div>
+                    <div class="preview-gallery" id="preview-gallery"></div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" id="cancel-ticket">Cancelar</button>
+                    <button type="submit" class="btn-primary" id="save-ticket">Guardar Ticket</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="notification-toast" class="toast">
+        <div class="toast-content">
+            <span class="toast-icon"></span>
+            <div class="toast-text">
+                <h4 id="toast-title">Email Enviado</h4>
+                <p id="toast-message">La notificación ha sido procesada correctamente.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Supabase CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="tickets.js"></script>
+</body>
+
+</html>
