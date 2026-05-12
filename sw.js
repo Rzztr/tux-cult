@@ -1,16 +1,16 @@
-const VERSION = "v1.0.0-kanban";
-const CACHE_NAME = `kanban-cache-${VERSION}`;
+const VERSION = "v1.0.0-tickets";
+const CACHE_NAME = `tickets-cache-${VERSION}`;
 const STATIC_ASSETS = [
     "/",
     "/index.html",
-    "/style.css",
-    "/script.js",
-    "/favicon.ico",
+    "/tickets.css",
+    "/tickets.js",
+    "/icon.png",
     "/manifest.json"
 ];
 
 self.addEventListener("install", (event) => {
-    console.log("[SW] Instalando Kanban Service Worker...");
+    console.log("[SW] Instalando tickets Service Worker...");
     event.waitUntil(
         caches
             .open(CACHE_NAME)
@@ -28,7 +28,7 @@ self.addEventListener("activate", (event) => {
         caches.keys().then((cacheNames) =>
             Promise.all(
                 cacheNames
-                    .filter((name) => name !== CACHE_NAME && name.startsWith('kanban-cache-'))
+                    .filter((name) => name !== CACHE_NAME && name.startsWith('tickets-cache-'))
                     .map((name) => caches.delete(name))
             )
         ).then(() => self.clients.claim())
