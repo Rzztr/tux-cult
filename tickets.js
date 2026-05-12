@@ -277,15 +277,15 @@ const TicketApp = (() => {
         },
 
         getStatusClass(status) {
-            if (status === 'Abierto') return 'open';
+            if (status === 'Abierto' || status === 'Planeado') return 'open';
             if (status === 'En Proceso') return 'process';
-            return 'done';
+            return 'done'; // Finalizado, Realizado, Reportado
         },
 
         updateStats() {
-            DOM.stats.open.textContent = state.tickets.filter(t => t.status === 'Abierto').length;
+            DOM.stats.open.textContent = state.tickets.filter(t => t.status === 'Abierto' || t.status === 'Planeado').length;
             DOM.stats.process.textContent = state.tickets.filter(t => t.status === 'En Proceso').length;
-            DOM.stats.done.textContent = state.tickets.filter(t => t.status === 'Finalizado').length;
+            DOM.stats.done.textContent = state.tickets.filter(t => t.status === 'Finalizado' || t.status === 'Realizado' || t.status === 'Reportado').length;
         },
 
         getFilteredTickets() {

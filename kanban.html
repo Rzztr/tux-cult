@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tablero Kanban - SIGOD</title>
+    <link rel="stylesheet" href="tickets.css">
+    <link rel="shortcut icon" href="assets/icon.png" type="image/x-icon">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="MSGReader.js"></script>
+    <link rel="stylesheet" href="styleKanban.css">
+</head>
+
+<body class="auth-mode">
+    <div id="loading-overlay">
+        <div class="spinner"></div>
+        <p>Sincronizando con SIGOD...</p>
+    </div>
+
+    <!-- Login Screen -->
+    <div id="login-screen" class="login-screen">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="logo-circle">S</div>
+                <h1>SIGOD</h1>
+                <p>Gestión de Incidentes</p>
+            </div>
+            <form id="login-form">
+                <div class="form-group">
+                    <label>Usuario</label>
+                    <input type="text" id="login-username" required placeholder="Tu usuario">
+                </div>
+                <div class="form-group">
+                    <label>Contraseña</label>
+                    <input type="password" id="login-password" required placeholder="••••••••">
+                </div>
+                <div id="login-error" class="error-msg" style="display: none;"></div>
+                <button type="submit" class="btn-primary btn-block">Acceder al Tablero</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="app-container" id="app-container" style="display: none;">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo-circle">S</div>
+                <h2>SIGOD</h2>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="index.html"><span class="icon"></span> Dashboard</a>
+                <a href="kanban.html" class="active"><span class="icon"></span> Tablero Kanban</a>
+                <a href="#" id="logout-btn" style="margin-top: auto; color: #f87171;"><span class="icon"></span>
+                    Salir</a>
+            </nav>
+            <div class="sidebar-footer">
+                <p>v2.2.0 - Senior Dashboard</p>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="top-bar">
+                <div class="search-container">
+                    <input type="text" id="kanban-search" placeholder="Buscar por ticket o descripción...">
+                </div>
+                <div class="user-profile">
+                    <div class="avatar" id="user-avatar">?</div>
+                    <button id="logout-btn-top" class="text-btn"
+                        style="color: #f87171; font-size: 0.85rem;">Salir</button>
+                </div>
+            </header>
+
+            <section class="dashboard-header">
+                <div class="welcome">
+                    <h1>Tablero de Tickets</h1>
+                    <p>Visualiza y gestiona el flujo de incidentes en tiempo real.</p>
+                </div>
+                <div class="actions">
+                    <button id="open-task-modal" class="btn-primary">+ Nuevo Ticket</button>
+                </div>
+            </section>
+
+            <div class="kanban-container">
+                <!-- Planeado -->
+                <div class="kanban-column" id="Planeado">
+                    <div class="column-header">
+                        <h2>Planeado</h2>
+                        <span class="task-count" id="count-Planeado">0</span>
+                    </div>
+                    <div class="tasks-container" ondrop="drop(event)" ondragover="allowDrop(event)"
+                        ondragleave="dragLeave(event)"></div>
+                </div>
+
+                <!-- En Proceso -->
+                <div class="kanban-column" id="En_Proceso">
+                    <div class="column-header">
+                        <h2>En Proceso</h2>
+                        <span class="task-count" id="count-En_Proceso">0</span>
+                    </div>
+                    <div class="tasks-container" ondrop="drop(event)" ondragover="allowDrop(event)"
+                        ondragleave="dragLeave(event)"></div>
+                </div>
+
+                <!-- Realizado -->
+                <div class="kanban-column" id="Realizado">
+                    <div class="column-header">
+                        <h2>Realizado</h2>
+                        <span class="task-count" id="count-Realizado">0</span>
+                    </div>
+                    <div class="tasks-container" ondrop="drop(event)" ondragover="allowDrop(event)"
+                        ondragleave="dragLeave(event)"></div>
+                </div>
+
+                <!-- Reportado -->
+                <div class="kanban-column" id="Reportado">
+                    <div class="column-header">
+                        <h2>Reportado</h2>
+                        <span class="task-count" id="count-Reportado">0</span>
+                    </div>
+                    <div class="tasks-container" ondrop="drop(event)" ondragover="allowDrop(event)"
+                        ondragleave="dragLeave(event)"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="task-modal" class="modal">
+        <div class="modal-content">
+            <header class="modal-header">
+                <h2>Nuevo Ticket de Seguridad</h2>
+                <span class="close-modal" id="close-modal">&times;</span>
+            </header>
+            <div class="ticket-form">
+                <div class="msg-drop-zone" id="msg-drop-zone">
+                    <i></i>
+                    <p>Arrastra un archivo <b>.msg</b> o haz clic para subir</p>
+                    <input type="file" id="msg-input" accept=".msg" hidden>
+                </div>
+
+                <form id="new-task-form">
+                    <div class="form-group">
+                        <label>Título / ID Ticket</label>
+                        <input type="text" id="task-title" required placeholder="SIR-XXXXXX - Patrón de ataque">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Prioridad</label>
+                            <select id="task-priority">
+                                <option value="alta">Alta</option>
+                                <option value="media" selected>Media</option>
+                                <option value="baja">Baja</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Asignado a</label>
+                            <input type="text" id="task-assignee" placeholder="Nombre del analista">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Descripción técnica</label>
+                        <textarea id="task-desc" rows="4" placeholder="Detalles del incidente detectado..."></textarea>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn-secondary" id="cancel-task">Cancelar</button>
+                        <button type="submit" class="btn-primary">Guardar en Tablero</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="notification-toast" class="toast">
+        <div class="toast-content">
+            <span class="toast-icon"></span>
+            <div class="toast-text">
+                <h4 id="toast-title">Éxito</h4>
+                <p id="toast-message">Operación finalizada.</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="kanban.js"></script>
+</body>
+
+</html>
