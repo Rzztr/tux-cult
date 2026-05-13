@@ -41,7 +41,8 @@ const KanbanApp = (() => {
             "Reportado": document.getElementById('count-Reportado')
         },
         search: document.getElementById('kanban-search'),
-        toast: document.getElementById('notification-toast')
+        toast: document.getElementById('notification-toast'),
+        themeToggle: document.getElementById('theme-toggle')
     };
 
     // --- CORE LOGIC ---
@@ -342,6 +343,16 @@ const KanbanApp = (() => {
 
             DOM.search.addEventListener('input', () => UI.renderBoard());
 
+            // Theme Toggle
+            if (DOM.themeToggle) {
+                DOM.themeToggle.onclick = () => {
+                    document.body.classList.toggle('dark-theme');
+                    const isDark = document.body.classList.contains('dark-theme');
+                    localStorage.setItem('sigod_theme', isDark ? 'dark' : 'light');
+                    DOM.themeToggle.textContent = isDark ? '☀️' : '🌓';
+                };
+            }
+
             // MSG Drop Zone
             const dropZone = document.getElementById('msg-drop-zone');
             const msgInput = document.getElementById('msg-input');
@@ -427,6 +438,13 @@ const KanbanApp = (() => {
 
     return {
         init() {
+            // Load saved theme
+            const savedTheme = localStorage.getItem('sigod_theme');
+            if (savedTheme === 'dark') {
+                document.body.classList.add('dark-theme');
+                if (DOM.themeToggle) DOM.themeToggle.textContent = '☀️';
+            }
+
             Handlers.init();
             if (!Auth.checkSession()) console.log('Auth check...');
         },

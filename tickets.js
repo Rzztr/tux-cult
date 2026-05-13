@@ -46,7 +46,8 @@ const TicketApp = (() => {
         appContainer: document.getElementById('app-container'),
         loginForm: document.getElementById('login-form'),
         loginError: document.getElementById('login-error'),
-        syncBucketBtn: document.getElementById('sync-bucket-btn')
+        syncBucketBtn: document.getElementById('sync-bucket-btn'),
+        themeToggle: document.getElementById('theme-toggle')
     };
 
     // --- STORAGE MODULE (SUPABASE) ---
@@ -662,6 +663,16 @@ const TicketApp = (() => {
                 };
             }
 
+            // Theme Toggle
+            if (DOM.themeToggle) {
+                DOM.themeToggle.onclick = () => {
+                    document.body.classList.toggle('dark-theme');
+                    const isDark = document.body.classList.contains('dark-theme');
+                    localStorage.setItem('sigod_theme', isDark ? 'dark' : 'light');
+                    DOM.themeToggle.textContent = isDark ? '☀️' : '🌓';
+                };
+            }
+
             // Auth Events
             DOM.loginForm.onsubmit = (e) => Auth.handleLogin(e);
             
@@ -708,6 +719,14 @@ const TicketApp = (() => {
     // --- PUBLIC API ---
     return {
         async init() {
+            // Load saved theme
+            const savedTheme = localStorage.getItem('sigod_theme');
+            if (savedTheme === 'dark') {
+                document.body.classList.add('dark-theme');
+                const toggleBtn = document.getElementById('theme-toggle');
+                if (toggleBtn) toggleBtn.textContent = '☀️';
+            }
+            
             Handlers.init();
             if (!Auth.checkSession()) {
                 console.log('Esperando autenticación...');
