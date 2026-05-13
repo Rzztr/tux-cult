@@ -265,6 +265,28 @@ const KanbanApp = (() => {
             document.getElementById('toast-message').textContent = message;
             DOM.toast.classList.add('show');
             setTimeout(() => DOM.toast.classList.remove('show'), 3000);
+        },
+
+        fillFormFromMSG(data) {
+            // Extract SIR number from subject (e.g., SIR0054352)
+            const sirMatch = (data.subject || '').match(/SIR\d+/i);
+            const sirNumber = sirMatch ? sirMatch[0].toUpperCase() : '';
+            
+            // In Kanban, we use the title field for the ID/Title combo
+            const fullTitle = sirNumber ? `${sirNumber} - ${data.subject}` : data.subject;
+            
+            document.getElementById('task-title').value = fullTitle || '';
+            document.getElementById('task-desc').value = data.from.email || '';
+            document.getElementById('task-assignee').value = data.from.name || '';
+            
+            // Extract priority from subject or body if possible
+            if (data.subject.toLowerCase().includes('alta') || data.subject.toLowerCase().includes('high') || data.subject.toLowerCase().includes('crítico')) {
+                document.getElementById('task-priority').value = 'alta';
+            } else if (data.subject.toLowerCase().includes('baja') || data.subject.toLowerCase().includes('low')) {
+                document.getElementById('task-priority').value = 'baja';
+            }
+            
+            this.showNotify('MSG Cargado', 'SIR y remitente extraídos correctamente.');
         }
     };
 
@@ -347,25 +369,18 @@ const KanbanApp = (() => {
                     alert('Por favor, selecciona un archivo .msg');
                     return;
                 }
-                UI.showNotify('Procesando MSG', 'Extrayendo información...');
+                UI.showNotify('Procesando MSG', `Leyendo ${file.name}...`);
                 
                 try {
-                    const reader = new FileReader();
-                    reader.onload = async function(e) {
-                        const buffer = e.target.result;
-                        const msgReader = new window.MSGReader(buffer);
-                        const fileData = msgReader.getFileData();
-                        
-                        if (fileData) {
-                            document.getElementById('task-title').value = fileData.subject || "";
-                            document.getElementById('task-desc').value = fileData.body || "";
-                            UI.showNotify('MSG Procesado', 'Formulario autocompletado.');
-                        }
-                    };
-                    reader.readAsArrayBuffer(file);
+                    const result = await MSGParser.parseFile(file);
+                    if (result.success) {
+                        UI.fillFormFromMSG(result.data);
+                    } else {
+                        alert('Error al leer MSG: ' + result.error);
+                    }
                 } catch (err) {
                     console.error('Error parsing MSG:', err);
-                    UI.showNotify('Error', 'No se pudo leer el MSG.');
+                    alert('Error técnico al procesar el archivo MSG.');
                 }
             }
         }
@@ -423,3 +438,88 @@ const KanbanApp = (() => {
 })();
 
 document.addEventListener('DOMContentLoaded', KanbanApp.init);
+
+// MSG Parser Module (Consistent with tickets.js)
+const MSGParser = (() => {
+    async function parseFile(file) {
+        try {
+            if (!file.name.toLowerCase().endsWith('.msg')) {
+                throw new Error('El archivo debe ser de formato .msg');
+            }
+            const arrayBuffer = await readFileAsArrayBuffer(file);
+            const msg = await processWithMSGReader(arrayBuffer);
+            const parsedData = extractMessageData(msg);
+            return {
+                success: true,
+                data: parsedData,
+                fileName: file.name,
+                fileSize: file.size,
+                timestamp: new Date().toISOString()
+            };
+        } catch (error) {
+            return {
+                success: false,
+                error: error.message,
+                fileName: file.name
+            };
+        }
+    }
+
+    function readFileAsArrayBuffer(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.onerror = (e) => reject(new Error('Error al leer el archivo'));
+            reader.readAsArrayBuffer(file);
+        });
+    }
+
+    async function processWithMSGReader(arrayBuffer) {
+        try {
+            const MSGReaderClass = window.MSGReader || (typeof MSGReader !== 'undefined' ? MSGReader : null);
+            if (!MSGReaderClass) {
+                throw new Error('MSGReader no está disponible.');
+            }
+            const msgReader = new MSGReaderClass(new Uint8Array(arrayBuffer));
+            const fileData = msgReader.getFileData();
+            if (!fileData || fileData.error) {
+                throw new Error(fileData?.error || 'No se pudieron extraer datos');
+            }
+            return fileData;
+        } catch (error) {
+            throw new Error(`Error en MSGReader: ${error.message}`);
+        }
+    }
+
+    function extractMessageData(msg) {
+        return {
+            from: {
+                name: getPropertyValue(msg, 'senderName') || 'Desconocido',
+                email: getPropertyValue(msg, 'senderEmail') || getPropertyValue(msg, 'senderSmtpAddress') || ''
+            },
+            subject: getPropertyValue(msg, 'subject') || '(Sin asunto)',
+            body: {
+                text: getPropertyValue(msg, 'body') || getPropertyValue(msg, 'bodyText') || ''
+            },
+            date: getPropertyValue(msg, 'clientSubmitTime') || getPropertyValue(msg, 'messageDeliveryTime')
+        };
+    }
+
+    function getPropertyValue(obj, path) {
+        if (!obj) return null;
+        const paths = [
+            path, 
+            path.toLowerCase(), 
+            path.replace(/([A-Z])/g, '_$1').toLowerCase(),
+            `prop_${path}`
+        ];
+        for (let p of paths) {
+            if (p in obj && obj[p] !== undefined && obj[p] !== null) {
+                return obj[p];
+            }
+        }
+        return null;
+    }
+
+    return { parseFile };
+})();

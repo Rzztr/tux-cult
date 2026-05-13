@@ -365,6 +365,28 @@ const TicketApp = (() => {
                 `;
                 DOM.previewGallery.appendChild(item);
             });
+        },
+
+        fillFormFromMSG(data) {
+            // Extract SIR number from subject (e.g., SIR0054352)
+            const sirMatch = (data.subject || '').match(/SIR\d+/i);
+            const sirNumber = sirMatch ? sirMatch[0].toUpperCase() : '';
+            
+            document.getElementById('ticket-title').value = data.subject || '';
+            document.getElementById('ticket-sir-manual').value = sirNumber;
+            document.getElementById('ticket-desc').value = data.from.email || '';
+            document.getElementById('ticket-origin').value = '';
+            
+            // Extract pattern if found in subject
+            const patterns = ['Brute Force', 'DDoS', 'Phishing', 'Malware', 'SQL Injection', 'Inyección SQL'];
+            for (const p of patterns) {
+                if (data.subject.toLowerCase().includes(p.toLowerCase())) {
+                    document.getElementById('ticket-pattern').value = p;
+                    break;
+                }
+            }
+            
+            Notify.show('MSG Cargado', 'SIR y remitente extraídos correctamente.');
         }
     };
 
@@ -466,11 +488,29 @@ const TicketApp = (() => {
                 }
             };
 
-            // Image Upload
+            // File Upload (Images & MSG)
             DOM.uploadZone.onclick = () => DOM.imageInput.click();
-            DOM.imageInput.onchange = (e) => {
+            DOM.imageInput.onchange = async (e) => {
                 const files = Array.from(e.target.files);
-                state.currentFiles.push(...files);
+                for (const file of files) {
+                    if (file.name.toLowerCase().endsWith('.msg')) {
+                        try {
+                            // Indicate processing
+                            Notify.show('Procesando MSG', `Leyendo ${file.name}...`);
+                            const result = await MSGParser.parseFile(file);
+                            if (result.success) {
+                                UI.fillFormFromMSG(result.data);
+                            } else {
+                                alert('Error al leer MSG: ' + result.error);
+                            }
+                        } catch (err) {
+                            console.error('Error parsing MSG:', err);
+                            alert('Error técnico al procesar el archivo MSG.');
+                        }
+                    } else {
+                        state.currentFiles.push(file);
+                    }
+                }
                 UI.renderPreviews();
             };
 
@@ -586,6 +626,91 @@ const TicketApp = (() => {
             console.log('SIGOD Ticket System Data Loaded');
         }
     };
+})();
+
+// MSG Parser Module (Extracted from scriptsMSG.txt)
+const MSGParser = (() => {
+    async function parseFile(file) {
+        try {
+            if (!file.name.toLowerCase().endsWith('.msg')) {
+                throw new Error('El archivo debe ser de formato .msg');
+            }
+            const arrayBuffer = await readFileAsArrayBuffer(file);
+            const msg = await processWithMSGReader(arrayBuffer);
+            const parsedData = extractMessageData(msg);
+            return {
+                success: true,
+                data: parsedData,
+                fileName: file.name,
+                fileSize: file.size,
+                timestamp: new Date().toISOString()
+            };
+        } catch (error) {
+            return {
+                success: false,
+                error: error.message,
+                fileName: file.name
+            };
+        }
+    }
+
+    function readFileAsArrayBuffer(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.onerror = (e) => reject(new Error('Error al leer el archivo'));
+            reader.readAsArrayBuffer(file);
+        });
+    }
+
+    async function processWithMSGReader(arrayBuffer) {
+        try {
+            const MSGReaderClass = window.MSGReader || (typeof MSGReader !== 'undefined' ? MSGReader : null);
+            if (!MSGReaderClass) {
+                throw new Error('MSGReader no está disponible.');
+            }
+            const msgReader = new MSGReaderClass(new Uint8Array(arrayBuffer));
+            const fileData = msgReader.getFileData();
+            if (!fileData || fileData.error) {
+                throw new Error(fileData?.error || 'No se pudieron extraer datos');
+            }
+            return fileData;
+        } catch (error) {
+            throw new Error(`Error en MSGReader: ${error.message}`);
+        }
+    }
+
+    function extractMessageData(msg) {
+        return {
+            from: {
+                name: getPropertyValue(msg, 'senderName') || 'Desconocido',
+                email: getPropertyValue(msg, 'senderEmail') || getPropertyValue(msg, 'senderSmtpAddress') || ''
+            },
+            subject: getPropertyValue(msg, 'subject') || '(Sin asunto)',
+            body: {
+                text: getPropertyValue(msg, 'body') || getPropertyValue(msg, 'bodyText') || ''
+            },
+            date: getPropertyValue(msg, 'clientSubmitTime') || getPropertyValue(msg, 'messageDeliveryTime')
+        };
+    }
+
+    function getPropertyValue(obj, path) {
+        if (!obj) return null;
+        const paths = [
+            path, 
+            path.toLowerCase(), 
+            path.replace(/([A-Z])/g, '_$1').toLowerCase(),
+            `prop_${path}`
+        ];
+        for (let p of paths) {
+            if (p in obj && obj[p] !== undefined && obj[p] !== null) {
+                return obj[p];
+            }
+        }
+        return null;
+    }
+
+    return { parseFile };
 })();
 
 // Start the app
