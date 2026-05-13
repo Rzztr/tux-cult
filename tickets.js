@@ -45,7 +45,8 @@ const TicketApp = (() => {
         loginScreen: document.getElementById('login-screen'),
         appContainer: document.getElementById('app-container'),
         loginForm: document.getElementById('login-form'),
-        loginError: document.getElementById('login-error')
+        loginError: document.getElementById('login-error'),
+        syncBucketBtn: document.getElementById('sync-bucket-btn')
     };
 
     // --- STORAGE MODULE (SUPABASE) ---
@@ -158,6 +159,86 @@ const TicketApp = (() => {
             const { error } = await supabase.from('tickets').delete().eq('id', id);
             if (error) throw error;
             Notify.show('Ticket Eliminado', 'El registro ha sido removido.');
+        },
+
+        async syncTicketsFromBucket() {
+            try {
+                Notify.show('Sincronizando', 'Procesando archivos del bucket...');
+                
+                const { data: files, error } = await supabase.storage
+                    .from('tickets')
+                    .list('', { limit: 100 });
+
+                if (error) throw error;
+                if (!files || files.length === 0) {
+                    Notify.show('Bucket Vacío', 'No hay archivos para procesar.');
+                    return;
+                }
+
+                let createdCount = 0;
+                let skippedCount = 0;
+
+                for (const fileInfo of files) {
+                    if (fileInfo.metadata === null && !fileInfo.id) continue; 
+                    if (!fileInfo.name.toLowerCase().endsWith('.msg')) continue;
+
+                    const { data: blob, error: downloadError } = await supabase.storage
+                        .from('tickets')
+                        .download(fileInfo.name);
+
+                    if (downloadError || !blob) continue;
+
+                    const arrayBuffer = await blob.arrayBuffer();
+                    const result = await MSGParser.parseFile(arrayBuffer, fileInfo.name);
+                    
+                    if (!result.success) continue;
+
+                    const data = result.data;
+                    const sirMatch = (data.subject || '').match(/SIR\d+/i);
+                    const sirNumber = sirMatch ? sirMatch[0].toUpperCase() : null;
+
+                    if (sirNumber) {
+                        const { data: existing } = await supabase
+                            .from('tickets')
+                            .select('id')
+                            .eq('ticket_number', sirNumber)
+                            .maybeSingle();
+
+                        if (existing) {
+                            skippedCount++;
+                            continue;
+                        }
+                    }
+
+                    try {
+                        const ticketData = {
+                            title: data.subject || fileInfo.name,
+                            sir: sirNumber,
+                            status: 'Abierto',
+                            assignee: 'Sistema',
+                            pattern: '-',
+                            origin: '-',
+                            description: data.from.email || 'Generado desde bucket'
+                        };
+
+                        const patterns = ['Brute Force', 'DDoS', 'Phishing', 'Malware', 'SQL Injection', 'Inyección SQL'];
+                        for (const p of patterns) {
+                            if (ticketData.title.toLowerCase().includes(p.toLowerCase())) {
+                                ticketData.pattern = p;
+                                break;
+                            }
+                        }
+
+                        await this.addTicket(ticketData);
+                        createdCount++;
+                    } catch (e) {}
+                }
+
+                Notify.show('Sincronización Completa', `${createdCount} creados, ${skippedCount} omitidos.`);
+                
+            } catch (err) {
+                Notify.show('Error', 'Sincronización interrumpida.');
+            }
         }
     };
 
@@ -568,6 +649,19 @@ const TicketApp = (() => {
             // Export
             document.getElementById('export-csv-btn').onclick = () => Export.toCSV();
 
+            // Sync Bucket
+            if (DOM.syncBucketBtn) {
+                DOM.syncBucketBtn.onclick = async () => {
+                    DOM.syncBucketBtn.disabled = true;
+                    DOM.syncBucketBtn.textContent = 'Sincronizando...';
+                    await Logic.syncTicketsFromBucket();
+                    state.tickets = await Storage.fetchTickets();
+                    UI.render();
+                    DOM.syncBucketBtn.disabled = false;
+                    DOM.syncBucketBtn.textContent = 'Sincronizar Bucket';
+                };
+            }
+
             // Auth Events
             DOM.loginForm.onsubmit = (e) => Auth.handleLogin(e);
             
@@ -630,26 +724,43 @@ const TicketApp = (() => {
 
 // MSG Parser Module (Extracted from scriptsMSG.txt)
 const MSGParser = (() => {
-    async function parseFile(file) {
+    async function parseFile(input, fileName = '') {
         try {
-            if (!file.name.toLowerCase().endsWith('.msg')) {
+            let arrayBuffer;
+            let name = fileName;
+
+            if (input instanceof ArrayBuffer) {
+                arrayBuffer = input;
+            } else if (input instanceof File || input instanceof Blob) {
+                name = name || input.name;
+                arrayBuffer = await readFileAsArrayBuffer(input);
+            } else {
+                throw new Error('Tipo de entrada no soportado');
+            }
+
+            if (name && !name.toLowerCase().endsWith('.msg')) {
                 throw new Error('El archivo debe ser de formato .msg');
             }
-            const arrayBuffer = await readFileAsArrayBuffer(file);
+
+            // Simple signature check (CFBF)
+            const view = new Uint8Array(arrayBuffer);
+            if (view[0] !== 0xD0 || view[1] !== 0xCF || view[2] !== 0x11 || view[3] !== 0xE0) {
+                throw new Error('Formato de archivo no válido');
+            }
+
             const msg = await processWithMSGReader(arrayBuffer);
             const parsedData = extractMessageData(msg);
             return {
                 success: true,
                 data: parsedData,
-                fileName: file.name,
-                fileSize: file.size,
+                fileName: name,
                 timestamp: new Date().toISOString()
             };
         } catch (error) {
             return {
                 success: false,
                 error: error.message,
-                fileName: file.name
+                fileName: fileName
             };
         }
     }
