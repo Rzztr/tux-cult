@@ -13,21 +13,25 @@ body {
     background-color: var(--bg-main, #f0f2f5);
 }
 
+:root {
+    --kanban-gap: 20px;
+    --kanban-column-width: 320px;
+}
+
 .kanban-container {
     display: flex;
-    gap: var(--kanban-gap);
-    height: calc(100vh - 200px);
+    gap: var(--kanban-gap, 20px);
     overflow-x: auto;
     padding: 10px 0 20px;
     align-items: flex-start;
+    width: 100%;
 }
 
 .kanban-column {
     background-color: var(--col-bg);
     border-radius: 14px;
-    width: 320px;
-    min-width: 320px;
-    max-height: 100%;
+    width: var(--kanban-column-width, 320px);
+    min-width: var(--kanban-column-width, 320px);
     display: flex;
     flex-direction: column;
     border: 1px solid var(--border, transparent);
@@ -79,6 +83,7 @@ body.dark-theme .task-count {
     padding: 0 12px 12px;
     overflow-y: auto;
     min-height: 150px;
+    max-height: calc(100vh - 360px);
 }
 
 /* Card Styles */

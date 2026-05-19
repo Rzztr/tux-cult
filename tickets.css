@@ -116,6 +116,7 @@ body.dark-theme .sidebar-nav a.active {
     margin-left: 260px;
     padding: 32px;
     max-width: calc(100vw - 260px);
+    min-height: 100vh;
 }
 
 .top-bar {
